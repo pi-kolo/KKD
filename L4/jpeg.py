@@ -150,6 +150,7 @@ def predict_new(bit_map):
             prediction[y][x] = pixel - Pixel(r, g, b)
     return prediction
 
+
 types_desc = {
     predictW: "X̂ = W",
     predictN: "X̂ = N",
@@ -173,14 +174,16 @@ def entropy(data_set):
             entropy -= probability*log2(probability)
     return entropy
 
-def bit_map_to_tuple_list(list_list):
+
+def bitmap_to_pixel_list(list_list):
     new_list = []
     for el in list_list:
         for ee in el:
             new_list.append(ee)
     return new_list
 
-def bit_map_to_list(list_list):
+
+def bitmap_to_list(list_list):
     new_list = []
     for el in list_list:
         for ee in el:
@@ -211,18 +214,18 @@ def main():
     eb_min = (8, None)
 
     x2 = [[x[i][j] for i in range(1,len(x)-1)] for j in range(1,len(x[0])-1)]
-    print(f"Input file:\n    entropy={entropy(bit_map_to_list(x2))}")
-    print(f"    red_entropy={entropy(get_red(bit_map_to_tuple_list(x2)))}")
-    print(f"    green_entropy={entropy(get_green(bit_map_to_tuple_list(x2)))}")
-    print(f"    blue_entropy={entropy(get_blue(bit_map_to_tuple_list(x2)))}")
+    print(f"Input file:\n    entropy={entropy(bitmap_to_list(x2))}")
+    print(f"    red_entropy={entropy(get_red(bitmap_to_pixel_list(x2)))}")
+    print(f"    green_entropy={entropy(get_green(bitmap_to_pixel_list(x2)))}")
+    print(f"    blue_entropy={entropy(get_blue(bitmap_to_pixel_list(x2)))}")
 
     for typee, desc in types_desc.items():
         y = typee(x)
         
-        e1 = entropy(bit_map_to_list(y))
-        er = entropy(get_red(bit_map_to_tuple_list(y)))
-        eg = entropy(get_green(bit_map_to_tuple_list(y)))
-        eb = entropy(get_blue(bit_map_to_tuple_list(y)))
+        e1 = entropy(bitmap_to_list(y))
+        er = entropy(get_red(bitmap_to_pixel_list(y)))
+        eg = entropy(get_green(bitmap_to_pixel_list(y)))
+        eb = entropy(get_blue(bitmap_to_pixel_list(y)))
 
         if e1 < e_min[0]:
             e_min = (e1, desc)
