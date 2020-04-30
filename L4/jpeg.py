@@ -14,11 +14,11 @@ def read_tga(filename):
         header = list(map(int, f.read(18)))
         width = header[13]*256+header[12]
         height = header[15]*256+header[14]
-        image_array = [[(0,0,0) for _ in range(width+2)] for _ in range(height+2)]
+        image_array = [[Pixel(0,0,0) for _ in range(width+2)] for _ in range(height+2)]
         for row in range(height):
             for col in range(width):
-                image_array[row+1][col+1] = tuple(map(int, f.read(3)))
-        return image_array
+                image_array[row+1][col+1] = Pixel(*(list(map(int, f.read(3)))[::-1]))
+        return image_array[::-1]
 
 class Pixel:
     def __init__(self, r, g, b):
@@ -26,128 +26,128 @@ class Pixel:
         self.g = g
         self.b = b
 
+    def __add__(self, other):
+        return Pixel(
+            (self.r + other.r) % 256, 
+            (self.g + other.g) % 256, 
+            (self.b + other.b) % 256
+            )
+    
+    def __sub__(self, other):
+        return Pixel(
+            (self.r - other.r) % 256,
+            (self.g - other.g) % 256, 
+            (self.b - other.b) % 256
+        )
+
+    def __truediv__(self, n):
+        return Pixel(
+            self.r // 2,
+            self.g // 2,
+            self.b // 2
+            )
+
+    def __str__(self):
+        return str((self.r, self.g, self.b))
+
 
 def predictW(bit_map):
-    prediction = [[(0,0,0) for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
+    prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
     for y, row in enumerate(bit_map[1:-1]):
-        for x, cell in enumerate(row[1:-1]):
-            r = cell[0] - bit_map[y][x-1][0]
-            g = cell[1] - bit_map[y][x-1][1]
-            b = cell[2] - bit_map[y][x-1][2]
-            prediction[y][x] = (r%256, g%256, b%256)
+        for x, pixel in enumerate(row[1:-1]):
+            prediction[y][x] = pixel - bit_map[y][x-1]
     return prediction
 
 
 def predictN(bit_map):
-    prediction = [[(0, 0, 0) for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for row_index, row in enumerate(bit_map[1:-1]):
-        for col_index, cell in enumerate(row[1:-1]):
-            r = cell[0] - bit_map[row_index-1][col_index][0]
-            g = cell[1] - bit_map[row_index-1][col_index][1]
-            b = cell[2] - bit_map[row_index-1][col_index][2]
-            prediction[row_index][col_index] = (r%256, g%256, b%256)
+    prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
+    for y, row in enumerate(bit_map[1:-1]):
+        for x, pixel in enumerate(row[1:-1]):
+            prediction[y][x] = pixel - bit_map[y-1][x]
     return prediction
 
 
 def predictNW(bit_map):
-    prediction = [[(0, 0, 0) for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for row_index, row in enumerate(bit_map[1:-1]):
-        for col_index, cell in enumerate(row[1:-1]):
-            r = cell[0] - bit_map[row_index-1][col_index-1][0]
-            g = cell[1] - bit_map[row_index-1][col_index-1][1]
-            b = cell[2] - bit_map[row_index-1][col_index-1][2]
-            prediction[row_index][col_index] = (r%256, g%256, b%256)
+    prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
+    for y, row in enumerate(bit_map[1:-1]):
+        for x, pixel in enumerate(row[1:-1]):
+            prediction[y][x] = pixel - bit_map[y-1][x-1]
     return prediction
 
 # N + W - NW
 def predictNW1(bit_map):
-    prediction = [[(0, 0, 0) for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for row_index, row in enumerate(bit_map[1:-1]):
-        for col_index, cell in enumerate(row[1:-1]):
-            N = bit_map[row_index-1][col_index]
-            W = bit_map[row_index][col_index-1]
-            NW = bit_map[row_index-1][col_index-1]
-            r = cell[0] - (N[0] + W[0] - NW[0])
-            g = cell[1] - (N[1] + W[1] - NW[1])
-            b = cell[2] - (N[2] + W[2] - NW[2])
-            prediction[row_index][col_index] = (r%256, g%256, b%256)
+    prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
+    for y, row in enumerate(bit_map[1:-1]):
+        for x, pixel in enumerate(row[1:-1]):
+            N = bit_map[y-1][x]
+            W = bit_map[y][x-1]
+            NW = bit_map[y-1][x-1]
+            prediction[y][x] = pixel - (N + W - NW)
     return prediction
 
 # N + (W - NW)/2
 def predictNW2(bit_map):
-    prediction = [[(0, 0, 0) for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for row_index, row in enumerate(bit_map[1:-1]):
-        for col_index, cell in enumerate(row[1:-1]):
-            N = bit_map[row_index-1][col_index]
-            W = bit_map[row_index][col_index-1]
-            NW = bit_map[row_index-1][col_index-1]
-            r = cell[0] - (N[0] + (W[0] - NW[0])//2)
-            g = cell[1] - (N[1] + (W[1] - NW[1])//2)
-            b = cell[2] - (N[2] + (W[2] - NW[2])//2)
-            prediction[row_index][col_index] = (r%256, g%256, b%256)
+    prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
+    for y, row in enumerate(bit_map[1:-1]):
+        for x, pixel in enumerate(row[1:-1]):
+            N = bit_map[y-1][x]
+            W = bit_map[y][x-1]
+            NW = bit_map[y-1][x-1]
+            prediction[y][x] = pixel - (N + (W - NW) / 2)
     
     return prediction
 
 # W + (N - NW)/2
 def predictNW3(bit_map):
-    prediction = [[(0, 0, 0) for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for row_index, row in enumerate(bit_map[1:-1]):
-        for col_index, cell in enumerate(row[1:-1]):
-            N = bit_map[row_index-1][col_index]
-            W = bit_map[row_index][col_index-1]
-            NW = bit_map[row_index-1][col_index-1]
-
-            r = cell[0] - (W[0] + (N[0] - NW[0])//2)
-            g = cell[1] - (W[1] + (N[1] - NW[1])//2)
-            b = cell[2] - (W[2] + (N[2] - NW[2])//2)
-            prediction[row_index][col_index] = (r%256, g%256, b%256)
+    prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
+    for y, row in enumerate(bit_map[1:-1]):
+        for x, pixel in enumerate(row[1:-1]):
+            N = bit_map[y-1][x]
+            W = bit_map[y][x-1]
+            NW = bit_map[y-1][x-1]
+            prediction[y][x] = pixel - (W + (N - NW) / 2)
     
     return prediction
 
 # (N+W)/2
 def predictNW4(bit_map):
-    prediction = [[(0, 0, 0) for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for row_index, row in enumerate(bit_map[1:-1]):
-        for col_index, cell in enumerate(row[1:-1]):
-            N = bit_map[row_index-1][col_index]
-            W = bit_map[row_index][col_index-1]
-
-            r = cell[0] - (N[0] + W[0])//2 
-            g = cell[1] - (N[1] + W[1])//2
-            b = cell[2] - (N[2] + W[2])//2 
-            prediction[row_index][col_index] = (r%256, g%256, b%256)
-    
+    prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
+    for y, row in enumerate(bit_map[1:-1]):
+        for x, pixel in enumerate(row[1:-1]):
+            N = bit_map[y-1][x]
+            W = bit_map[y][x-1]
+            prediction[y][x] = pixel - (N + W) / 2 
     return prediction
 
 
 def predict_new(bit_map):
-    prediction = [[(0, 0, 0) for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for row_index, row in enumerate(bit_map[1:-1]):
-        for col_index, cell in enumerate(row[1:-1]):
-            N = bit_map[row_index-1][col_index]
-            W = bit_map[row_index][col_index-1]
-            NW = bit_map[row_index-1][col_index-1]
-            if NW[0] >= max(N[0], W[0]):
-                r = max(N[0], W[0])
-            elif NW[0] <= min(N[0], W[0]):
-                r = min(N[0], W[0])
+    prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
+    for y, row in enumerate(bit_map[1:-1]):
+        for x, pixel in enumerate(row[1:-1]):
+            N = bit_map[y-1][x]
+            W = bit_map[y][x-1]
+            NW = bit_map[y-1][x-1]
+            if NW.r >= max(N.r, W.r):
+                r = max(N.r, W.r)
+            elif NW.r <= min(N.r, W.r):
+                r = min(N.r, W.r)
             else:
-                r = W[0] + N[0] - NW[0]
+                r = W.r + N.r - NW.r
 
-            if NW[1] >= max(N[1], W[1]):
-                g = max(N[1], W[1])
-            elif NW[1] <= min(N[1], W[1]):
-                g = min(N[1], W[1])
+            if NW.g >= max(N.g, W.g):
+                g = max(N.g, W.g)
+            elif NW.g <= min(N.g, W.g):
+                g = min(N.g, W.g)
             else:
-                b = W[1] + N[1] - NW[1]
+                b = W.g + N.g - NW.g
             
-            if NW[2] >= max(N[2], W[2]):
-                b = max(N[2], W[2])
-            elif NW[2] <= min(N[2], W[2]):
-                b = min(N[2], W[2])
+            if NW.b >= max(N.b, W.b):
+                b = max(N.b, W.b)
+            elif NW.b <= min(N.b, W.b):
+                b = min(N.b, W.b)
             else:
-                b = W[2] + N[2] - NW[2]
-            prediction[row_index][col_index] = ((cell[0] - r)%256, (cell[1] - g)%256, (cell[2] - b)%256)
+                b = W.b + N.b - NW.b
+            prediction[y][x] = pixel - Pixel(r, g, b)
     return prediction
 
 types_desc = {
@@ -184,17 +184,27 @@ def bit_map_to_list(list_list):
     new_list = []
     for el in list_list:
         for ee in el:
-            for eee in ee:
-                new_list.append(eee)
+            new_list.append(ee.r)
+            new_list.append(ee.g)
+            new_list.append(ee.b)
     return new_list
 
+
+def get_green(bitmap_list):
+    return [x.g for x in bitmap_list]
+
+def get_blue(bitmap_list):
+    return [x.b for x in bitmap_list]
+
+def get_red(bitmap_list):
+    return [x.r for x in bitmap_list]
+
 def get_colour(bitmap_list, n):
-    return list(map(lambda x: x[n], bitmap_list))
+    return list(map(lambda x: x.n, bitmap_list))
 
 def main():
     filename = sys.argv[1]
     x = read_tga(filename)
-
     e_min = (8, None)
     er_min = (8, None)
     eg_min = (8, None)
@@ -202,17 +212,17 @@ def main():
 
     x2 = [[x[i][j] for i in range(1,len(x)-1)] for j in range(1,len(x[0])-1)]
     print(f"Input file:\n    entropy={entropy(bit_map_to_list(x2))}")
-    print(f"    red_entropy={entropy(get_colour(bit_map_to_tuple_list(x2),0))}")
-    print(f"    green_entropy={entropy(get_colour(bit_map_to_tuple_list(x2),1))}")
-    print(f"    blue_entropy={entropy(get_colour(bit_map_to_tuple_list(x2),2))}")
+    print(f"    red_entropy={entropy(get_red(bit_map_to_tuple_list(x2)))}")
+    print(f"    green_entropy={entropy(get_green(bit_map_to_tuple_list(x2)))}")
+    print(f"    blue_entropy={entropy(get_blue(bit_map_to_tuple_list(x2)))}")
 
     for typee, desc in types_desc.items():
         y = typee(x)
         
         e1 = entropy(bit_map_to_list(y))
-        er = entropy(get_colour(bit_map_to_tuple_list(y),0))
-        eg = entropy(get_colour(bit_map_to_tuple_list(y),1))
-        eb = entropy(get_colour(bit_map_to_tuple_list(y),2))
+        er = entropy(get_red(bit_map_to_tuple_list(y)))
+        eg = entropy(get_green(bit_map_to_tuple_list(y)))
+        eb = entropy(get_blue(bit_map_to_tuple_list(y)))
 
         if e1 < e_min[0]:
             e_min = (e1, desc)
@@ -229,7 +239,7 @@ def main():
         print(f"    green_entropy={eg}")
         print(f"    blue_entropy={eb}")
         print()
-    # print()
+
     print(f"Best results:")
     print(f"    Total: {e_min[0]} for {e_min[1]}")
     print(f"    Red: {er_min[0]} for {er_min[1]}")
