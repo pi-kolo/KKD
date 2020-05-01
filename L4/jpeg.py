@@ -47,86 +47,108 @@ class Pixel:
             self.b // 2
             )
 
+    def __repr__(self):
+        return str(self)
+
     def __str__(self):
         return str((self.r, self.g, self.b))
 
 
 def predictW(bit_map):
     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for y, row in enumerate(bit_map[1:-1]):
-        for x, pixel in enumerate(row[1:-1]):
-            prediction[y][x] = pixel - bit_map[y][x-1]
+    for y, row in enumerate(bit_map[1:-1],1):
+        for x, pixel in enumerate(row[1:-1], 1):
+            prediction[y-1][x-1] = pixel - bit_map[y][x-1]
     return prediction
 
 
 def predictN(bit_map):
     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for y, row in enumerate(bit_map[1:-1]):
-        for x, pixel in enumerate(row[1:-1]):
-            prediction[y][x] = pixel - bit_map[y-1][x]
+    for y, row in enumerate(bit_map[1:-1], 1):
+        for x, pixel in enumerate(row[1:-1], 1):
+            prediction[y-1][x-1] = pixel - bit_map[y-1][x]
     return prediction
 
 
 def predictNW(bit_map):
     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for y, row in enumerate(bit_map[1:-1]):
-        for x, pixel in enumerate(row[1:-1]):
-            prediction[y][x] = pixel - bit_map[y-1][x-1]
+    for y, row in enumerate(bit_map[1:-1], 1):
+        for x, pixel in enumerate(row[1:-1], 1):
+            prediction[y-1][x-1] = pixel - bit_map[y-1][x-1]
     return prediction
 
 # N + W - NW
 def predictNW1(bit_map):
     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for y, row in enumerate(bit_map[1:-1]):
-        for x, pixel in enumerate(row[1:-1]):
+    for y, row in enumerate(bit_map[1:-1], 1):
+        for x, pixel in enumerate(row[1:-1], 1):
             N = bit_map[y-1][x]
             W = bit_map[y][x-1]
             NW = bit_map[y-1][x-1]
-            prediction[y][x] = pixel - (N + W - NW)
+            prediction[y-1][x-1] = pixel - (N + W - NW)
     return prediction
 
 # N + (W - NW)/2
 def predictNW2(bit_map):
     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for y, row in enumerate(bit_map[1:-1]):
-        for x, pixel in enumerate(row[1:-1]):
+    for y, row in enumerate(bit_map[1:-1], 1):
+        for x, pixel in enumerate(row[1:-1], 1):
             N = bit_map[y-1][x]
             W = bit_map[y][x-1]
             NW = bit_map[y-1][x-1]
-            prediction[y][x] = pixel - (N + (W - NW) / 2)
+            prediction[y-1][x-1] = pixel - (N + (W - NW) / 2)
     
     return prediction
 
 # W + (N - NW)/2
 def predictNW3(bit_map):
     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for y, row in enumerate(bit_map[1:-1]):
-        for x, pixel in enumerate(row[1:-1]):
+    for y, row in enumerate(bit_map[1:-1], 1):
+        for x, pixel in enumerate(row[1:-1], 1):
             N = bit_map[y-1][x]
             W = bit_map[y][x-1]
             NW = bit_map[y-1][x-1]
-            prediction[y][x] = pixel - (W + (N - NW) / 2)
+            prediction[y-1][x-1] = pixel - (W + (N - NW) / 2)
     
     return prediction
 
 # (N+W)/2
 def predictNW4(bit_map):
     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for y, row in enumerate(bit_map[1:-1]):
-        for x, pixel in enumerate(row[1:-1]):
+    for y, row in enumerate(bit_map[1:-1], 1):
+        for x, pixel in enumerate(row[1:-1], 1):
             N = bit_map[y-1][x]
             W = bit_map[y][x-1]
-            prediction[y][x] = pixel - (N + W) / 2 
+            prediction[y-1][x-1] = pixel - (N + W) / 2 
     return prediction
 
 
+# :
+#     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
+#     for y, row in enumerate(bit_map[1:-1], 1):
+#         for x, pixel in enumerate(row[1:-1], 1):
+#             N = bit_map[y-1][x]
+#             W = bit_map[y][x-1]
+#             NW = bit_map[y-1][x-1]
+
+#             Nv = sqrt(N.r**2 + N.g**2 + N.b**2)
+#             Wv = sqrt(W.r**2 + W.g**2 + W.b**2)
+#             NWv = sqrt(NW.r**2 + NW.g**2 + NW.b**2)
+
+#             if NW >= max(Nv, Wv):
+#                 p = 
+
+#             prediction[y-1][x-1] = pixel - Pixel(r, g, b)
+#     return prediction
+
 def predict_new(bit_map):
     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
-    for y, row in enumerate(bit_map[1:-1]):
-        for x, pixel in enumerate(row[1:-1]):
+    for y, row in enumerate(bit_map[1:-1], 1):
+        for x, pixel in enumerate(row[1:-1], 1):
             N = bit_map[y-1][x]
             W = bit_map[y][x-1]
             NW = bit_map[y-1][x-1]
+
             if NW.r >= max(N.r, W.r):
                 r = max(N.r, W.r)
             elif NW.r <= min(N.r, W.r):
@@ -147,7 +169,7 @@ def predict_new(bit_map):
                 b = min(N.b, W.b)
             else:
                 b = W.b + N.b - NW.b
-            prediction[y][x] = pixel - Pixel(r, g, b)
+            prediction[y-1][x-1] = pixel - Pixel(r, g, b)
     return prediction
 
 
@@ -212,16 +234,16 @@ def main():
     er_min = (8, None)
     eg_min = (8, None)
     eb_min = (8, None)
-
-    x2 = [[x[i][j] for i in range(1,len(x)-1)] for j in range(1,len(x[0])-1)]
-    print(f"Input file:\n    entropy={entropy(bitmap_to_list(x2))}")
+    x2 = [[x[i][j] for j in range(1,len(x[0])-1)] for i in range(1,len(x)-1)]
+    # print(x[2][1:-1])
+    # print(x2[0])
+    print(f"Input file: {filename}\n    entropy={entropy(bitmap_to_list(x2))}")
     print(f"    red_entropy={entropy(get_red(bitmap_to_pixel_list(x2)))}")
     print(f"    green_entropy={entropy(get_green(bitmap_to_pixel_list(x2)))}")
-    print(f"    blue_entropy={entropy(get_blue(bitmap_to_pixel_list(x2)))}")
+    print(f"    blue_entropy={entropy(get_blue(bitmap_to_pixel_list(x2)))}\n")
 
     for typee, desc in types_desc.items():
         y = typee(x)
-        
         e1 = entropy(bitmap_to_list(y))
         er = entropy(get_red(bitmap_to_pixel_list(y)))
         eg = entropy(get_green(bitmap_to_pixel_list(y)))
