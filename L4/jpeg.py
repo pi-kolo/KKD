@@ -1,3 +1,5 @@
+#Piotr Kołodziejczyk
+
 from math import log2
 import sys
 # header struct:
@@ -28,24 +30,31 @@ class Pixel:
 
     def __add__(self, other):
         return Pixel(
-            (self.r + other.r) % 256, 
-            (self.g + other.g) % 256, 
-            (self.b + other.b) % 256
+            (self.r + other.r), 
+            (self.g + other.g), 
+            (self.b + other.b)
             )
     
     def __sub__(self, other):
         return Pixel(
-            (self.r - other.r) % 256,
-            (self.g - other.g) % 256, 
-            (self.b - other.b) % 256
+            (self.r - other.r),
+            (self.g - other.g), 
+            (self.b - other.b)
         )
 
-    def __truediv__(self, n):
+    def __floordiv__(self, n):
         return Pixel(
             self.r // 2,
             self.g // 2,
             self.b // 2
             )
+
+    def __mod__(self, n):
+        return Pixel(
+            self.r % n,
+            self.g % n,
+            self.b % n
+        )
 
     def __repr__(self):
         return str(self)
@@ -58,7 +67,7 @@ def predictW(bit_map):
     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
     for y, row in enumerate(bit_map[1:-1],1):
         for x, pixel in enumerate(row[1:-1], 1):
-            prediction[y-1][x-1] = pixel - bit_map[y][x-1]
+            prediction[y-1][x-1] = (pixel - bit_map[y][x-1]) % 256
     return prediction
 
 
@@ -66,7 +75,7 @@ def predictN(bit_map):
     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
     for y, row in enumerate(bit_map[1:-1], 1):
         for x, pixel in enumerate(row[1:-1], 1):
-            prediction[y-1][x-1] = pixel - bit_map[y-1][x]
+            prediction[y-1][x-1] = (pixel - bit_map[y-1][x]) % 256
     return prediction
 
 
@@ -74,7 +83,7 @@ def predictNW(bit_map):
     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
     for y, row in enumerate(bit_map[1:-1], 1):
         for x, pixel in enumerate(row[1:-1], 1):
-            prediction[y-1][x-1] = pixel - bit_map[y-1][x-1]
+            prediction[y-1][x-1] = (pixel - bit_map[y-1][x-1]) % 256
     return prediction
 
 # N + W - NW
@@ -85,7 +94,7 @@ def predictNW1(bit_map):
             N = bit_map[y-1][x]
             W = bit_map[y][x-1]
             NW = bit_map[y-1][x-1]
-            prediction[y-1][x-1] = pixel - (N + W - NW)
+            prediction[y-1][x-1] = (pixel - (N + W - NW)) % 256
     return prediction
 
 # N + (W - NW)/2
@@ -96,7 +105,7 @@ def predictNW2(bit_map):
             N = bit_map[y-1][x]
             W = bit_map[y][x-1]
             NW = bit_map[y-1][x-1]
-            prediction[y-1][x-1] = pixel - (N + (W - NW) / 2)
+            prediction[y-1][x-1] = (pixel - (N + (W - NW) // 2)) % 256
     
     return prediction
 
@@ -108,7 +117,7 @@ def predictNW3(bit_map):
             N = bit_map[y-1][x]
             W = bit_map[y][x-1]
             NW = bit_map[y-1][x-1]
-            prediction[y-1][x-1] = pixel - (W + (N - NW) / 2)
+            prediction[y-1][x-1] = (pixel - (W + (N - NW) // 2)) % 256
     
     return prediction
 
@@ -119,11 +128,11 @@ def predictNW4(bit_map):
         for x, pixel in enumerate(row[1:-1], 1):
             N = bit_map[y-1][x]
             W = bit_map[y][x-1]
-            prediction[y-1][x-1] = pixel - (N + W) / 2 
+            prediction[y-1][x-1] = (pixel - (N + W) // 2 ) % 256
     return prediction
 
-
-# :
+#lecture version
+# def predict_new(bit_map):
 #     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
 #     for y, row in enumerate(bit_map[1:-1], 1):
 #         for x, pixel in enumerate(row[1:-1], 1):
@@ -131,45 +140,46 @@ def predictNW4(bit_map):
 #             W = bit_map[y][x-1]
 #             NW = bit_map[y-1][x-1]
 
-#             Nv = sqrt(N.r**2 + N.g**2 + N.b**2)
-#             Wv = sqrt(W.r**2 + W.g**2 + W.b**2)
-#             NWv = sqrt(NW.r**2 + NW.g**2 + NW.b**2)
+#             if NW.r >= max(N.r, W.r):
+#                 r = max(N.r, W.r)
+#             elif NW.r <= min(N.r, W.r):
+#                 r = min(N.r, W.r)
+#             else:
+#                 r = W.r + N.r - NW.r
 
-#             if NW >= max(Nv, Wv):
-#                 p = 
-
-#             prediction[y-1][x-1] = pixel - Pixel(r, g, b)
+#             if NW.g >= max(N.g, W.g):
+#                 g = max(N.g, W.g)
+#             elif NW.g <= min(N.g, W.g):
+#                 g = min(N.g, W.g)
+#             else:
+#                 b = W.g + N.g - NW.g
+            
+#             if NW.b >= max(N.b, W.b):
+#                 b = max(N.b, W.b)
+#             elif NW.b <= min(N.b, W.b):
+#                 b = min(N.b, W.b)
+#             else:
+#                 b = W.b + N.b - NW.b
+#             prediction[y-1][x-1] = (pixel - Pixel(r, g, b)) % 256
 #     return prediction
 
-def predict_new(bit_map):
+# def min_()
+
+def predict_newer(bit_map):
     prediction = [[None for _ in range(len(bit_map[0])-2)] for _ in range(len(bit_map)-2)]
     for y, row in enumerate(bit_map[1:-1], 1):
         for x, pixel in enumerate(row[1:-1], 1):
             N = bit_map[y-1][x]
             W = bit_map[y][x-1]
             NW = bit_map[y-1][x-1]
-
-            if NW.r >= max(N.r, W.r):
-                r = max(N.r, W.r)
-            elif NW.r <= min(N.r, W.r):
-                r = min(N.r, W.r)
-            else:
-                r = W.r + N.r - NW.r
-
-            if NW.g >= max(N.g, W.g):
-                g = max(N.g, W.g)
-            elif NW.g <= min(N.g, W.g):
-                g = min(N.g, W.g)
-            else:
-                b = W.g + N.g - NW.g
             
-            if NW.b >= max(N.b, W.b):
-                b = max(N.b, W.b)
-            elif NW.b <= min(N.b, W.b):
-                b = min(N.b, W.b)
-            else:
-                b = W.b + N.b - NW.b
-            prediction[y-1][x-1] = pixel - Pixel(r, g, b)
+            minNW = Pixel(min(N.r, W.r), min(N.g, W.g), min(N.b, W.b))
+            maxNW = Pixel(max(N.r, W.r), max(N.g, W.g), max(N.b, W.b))
+
+            r = minNW.r if NW.r >= maxNW.r else maxNW.r if NW.r <= minNW.r else N.r + W.r - NW.r
+            g = minNW.g if NW.g >= maxNW.g else maxNW.g if NW.g <= minNW.g else N.g + W.g - NW.g
+            b = minNW.b if NW.b >= maxNW.b else maxNW.b if NW.b <= minNW.b else N.b + W.b - NW.b
+            prediction[y-1][x-1] = (pixel - Pixel(r,g,b)) % 256
     return prediction
 
 
@@ -181,7 +191,7 @@ types_desc = {
     predictNW2: "X̂ = N + (W - NW)/2",
     predictNW3: "X̂ = W + (N - NW)/2",
     predictNW4: "X̂ = (N + W)/2",
-    predict_new: "new standard"
+    predict_newer: "new standard"
 }
 
 

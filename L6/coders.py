@@ -82,9 +82,8 @@ def bitmap_to_bytes(bitmap):
             payload.extend([e.r, e.g, e.b])
     return bytes(payload)
 
-# (-255,255)
-def quants1(bits):
-    min = -255
+# (min,255)
+def quants(bits, min):
     delta = 512
     n = 2**bits
     values = []
@@ -99,22 +98,20 @@ def quants1(bits):
 
     return values, quant_dict
 
-# (0, 255)
-def quants2(bits):
-    min = 0
-    delta = 256
-    n = 2**bits
-    values = []
-    for i in range(n):
-        values.append(int(min + delta/n * (i+0.5)))
-    quant_dict = {}
-    k = 0
-    for i in range(0, 256):
-        if k+1 < n and abs(values[k+1] - i) < abs(values[k] - i):
-            k += 1
-        quant_dict[i] = k
 
-    return values, quant_dict
+
+def differences_sequence(sequence):
+    diffs = [sequence[0]]
+    for i in range(1, len(sequence)):
+        diffs.append(sequence[i] - sequence[i-1])
+    return diffs
+
+
+def reconstruct_from_differences(diffs):
+    sequence = [diffs[0]]
+    for i in range(1, len(diffs)):
+        sequence.append(sequence[-1] + diffs[i])
+    return sequence
 
 
 def differential_encoding(bitmap, bits):
@@ -123,18 +120,26 @@ def differential_encoding(bitmap, bits):
         for _, pixel in enumerate(row):
             pixels.extend([pixel.r, pixel.g, pixel.b]) 
 
+    # print(pixels[500:800])
     # differences sequence
-    subs = [pixels[0]]
-    for i, el in enumerate(pixels[:-1]):
-        subs.append(pixels[i+1]-pixels[i])
+    subs = differences_sequence(pixels)
 
     # n-bits quantized values
-    quant_vals, quant_dict = quants1(bits)
+    _, quant_dict = quants(bits, -255)
 
     # quantize values 
     coded = [quant_dict[el] for el in subs]
-    
+    # print(coded)
     return ''.join([num_to_bits(el, bits) for el in coded])
+
+
+def differential_decoding(file, bits):
+    quant_vals, _ = quants(bits, -255)
+    bitstring, header = read_encoded(file)
+    differences = [quant_vals[int(bitstring[i:i+bits], 2)] for i in range(0, len(bitstring), bits)]
+    # print(differences[:100])
+    rgbs = reconstruct_from_differences(differences) 
+    return rgbs, header
 
 
 def simple_quantizer_encoding(bitmap, bits):
@@ -143,50 +148,20 @@ def simple_quantizer_encoding(bitmap, bits):
         for _, pixel in enumerate(row):
             pixels.extend([pixel.r, pixel.g, pixel.b])
     
-    quant_vals, quant_dict = quants2(bits)
+    quant_vals, quant_dict = quants(bits, 0)
 
     coded = [quant_dict[el] for el in pixels]
 
     return ''.join([num_to_bits(el, bits) for el in coded])
 
+
 def simple_quantizer_decoding(file, bits):
-    quant_vals, quant_dict = quants2(bits)
+    quant_vals, quant_dict = quants(bits, 0)
     bitstring, header = read_encoded(file)
     rgbs = [quant_vals[int(bitstring[i:i+bits], 2)] for i in range(0, len(bitstring), bits)]
-    pixels = [Pixel(rgbs[i], rgbs[i+1], rgbs[i+2]) for i in range(0, len(rgbs), 3)]
-    width = header[13]*256+header[12]
-    height = header[15]*256+header[14]
-
-    
-    # image_array = [[None for _ in range(width)]
-    #                    for _ in range(height)]
-    # for row in range(height):
-    #     for col in range(width):
-    #         image_array[row][col] = pixels[row*width + col]
-
+ 
     return rgbs, header
 
-def differential_decoding(file, bits):
-    quant_vals, quant_dict = quants1(bits)
-    bitstring, header = read_encoded(file)
-    differences = [quant_vals[int(bitstring[i:i+bits], 2)] for i in range(0, len(bitstring), bits)]
-    print(differences[:100])
-    rgbs = [differences[0]]
-    for i in range(1, len(differences)):    # NIE DZIAŁA AAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-        rgbs.append(rgbs[-1] + differences[i])  # LECI W INFFFFFFFFFFINITY
-    # for i, el in enumerate(differences[1:]):
-    #     rgbs.append(rgbs[-1] + differences[i+1])
-    # print(rgbs[:100])
-    pixels = [Pixel(rgbs[i], rgbs[i+1], rgbs[i+2]) for i in range(0, len(rgbs), 3)]
-    width = header[13]*256+header[12]
-    height = header[15]*256+header[14]
-    image_array = [[None for _ in range(width)]
-                       for _ in range(height)]
-    for row in range(height):
-        for col in range(width):
-            image_array[row][col] = pixels[row*width + col]
-
-    return image_array
 
 # read encoded file (that has header and encoded bitmap somehow)
 def read_encoded(file_in):
@@ -223,7 +198,7 @@ def main():
         h[15] -= 1
     else:
         h[14] -= 2  
-    
+
     x = transform(bm, highpass_filter)
 
     # coded = differential_encoding(x, 5)
@@ -232,13 +207,16 @@ def main():
 
     # bm2 = differential_decoding("example.out", 5)
 
-    coded = simple_quantizer_encoding(x, 5)
+    coded = differential_encoding(x, 5)
     bitstring_to_file(coded, h, "example.out")
     # coded2, h2 = read_encoded("example.out")
-    bm2, h2 = simple_quantizer_decoding("example.out", 5)
+    bm2, h2 = differential_decoding("example.out", 5)
     # bitstring_to_file(bm2, h2, "examplee.tga")
     # print(bm2)
     with open("exampleee.tga", "wb") as f:
         f.write(bytes(h2) + bytes(bm2))
 
-main()
+if __name__ == "__main__":
+    main()
+
+
