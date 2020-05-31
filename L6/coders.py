@@ -149,22 +149,40 @@ def differential_decoding(file):
 
 
 def simple_quantizer_encoding(bitmap, bits):
-    pixels = []
+    rs = []
+    gs = []
+    bs = []
     for _, row in enumerate(bitmap):
         for _, pixel in enumerate(row):
-            pixels.extend([pixel.r, pixel.g, pixel.b])
+            rs.append(pixel.r)
+            gs.append(pixel.g)
+            bs.append(pixel.b)
     
-    quant_vals, quant_dict = quants(bits, 0)
+    # quant_vals, quant_dict = quants(bits, 0)
+    r_vals, quant_dict_r, _ = nonuniform_quantizer(rs, bits, 0, 255)
+    g_vals, quant_dict_g, _ = nonuniform_quantizer(gs, bits, 0, 255)
+    b_vals, quant_dict_b, _ = nonuniform_quantizer(bs, bits, 0, 255)
 
-    coded = [quant_dict[el] for el in pixels]
+    c_r = [quant_dict_r[el] for el in rs]
+    c_g = [quant_dict_g[el] for el in gs]
+    c_b = [quant_dict_b[el] for el in bs]
+    coded = c_r + c_g + c_b
 
-    return ''.join([num_to_bits(el, bits) for el in coded])
+    return ''.join([num_to_bits(el, bits) for el in coded]), r_vals, g_vals, b_vals
 
 
 def simple_quantizer_decoding(file, bits):
-    quant_vals, quant_dict = quants(bits, 0)
-    bitstring, header = read_encoded(file)
-    rgbs = [quant_vals[int(bitstring[i:i+bits], 2)] for i in range(0, len(bitstring), bits)]
+    # quant_vals, quant_dict = quants(bits, 0)
+
+    bitstring, header, rs, gs, bs = read_encoded2(file)
+    all_colors = [int(bitstring[i:i+bits], 2) for i in range(0, len(bitstring), bits)]
+    r_list = [rs[el] for el in all_colors[0 : len(all_colors)//3]]
+    g_list = [gs[el] for el in all_colors[len(all_colors)//3 : 2*len(all_colors)//3]]
+    b_list = [bs[el] for el in all_colors[2*len(all_colors)//3 :]]
+    rgbs = []
+    for i in range(len(r_list)):
+        rgbs.extend([r_list[i], g_list[i], b_list[i]])
+    # rgbs = [quant_vals[int(bitstring[i:i+bits], 2)] for i in range(0, len(bitstring), bits)]
  
     return rgbs, header
 
@@ -178,6 +196,17 @@ def read_encoded(file_in):
         result = result[:len(result)-n]
     return result, header
 
+def read_encoded2(file_in):
+    with open(file_in, "br") as f:
+        header = list(map(int, f.read(18)))
+        rs = list(map(int, (f.readline()).decode('utf-8').split()))
+        gs = list(map(int, (f.readline()).decode('utf-8').split()))
+        bs = list(map(int, (f.readline()).decode('utf-8').split()))
+        n = int.from_bytes((f.read(1)), byteorder='big')
+        result = ''.join([bin(c)[2:].zfill(8) for c in f.read()])
+        result = result[:len(result)-n]
+    return result, header, rs, gs, bs
+
 # save bitstring as a file
 def bitstring_to_file(bitstring, header, file_out):
     padding = 8 - len(bitstring)%8
@@ -185,6 +214,20 @@ def bitstring_to_file(bitstring, header, file_out):
     bytes_list = bytes([padding]) + bytes([int(bitstring[i:i+8],2) for i in range(0, len(bitstring), 8)])
     with open(file_out, "bw") as f:
         f.write(bytes(header) + bytes_list)
+
+def bitstring_to_file_with_vals(bitstring, header, file_out, rs, gs, bs):
+    padding = 8 - len(bitstring)%8
+    bitstring = bitstring + padding*'0'
+    bytes_list = bytes([padding]) + bytes([int(bitstring[i:i+8],2) for i in range(0, len(bitstring), 8)])
+    with open(file_out, "bw") as f:
+        f.write(bytes(header))
+        f.write(bytes(" ".join(list(map(str, rs))), 'utf-8'))
+        f.write(bytes('\n', 'utf-8'))
+        f.write(bytes(" ".join(list(map(str, gs))), 'utf-8'))
+        f.write(bytes('\n', 'utf-8'))
+        f.write(bytes(" ".join(list(map(str, bs))), 'utf-8'))
+        f.write(bytes('\n', 'utf-8'))
+        f.write(bytes_list)
 
 
 def nonuniform_quantizer(pixels, bits, min, max):
@@ -225,7 +268,7 @@ def nonuniform_quantizer(pixels, bits, min, max):
         if j+1 < n and abs(values[j+1] - i) <= abs(values[j] - i):
             j += 1
         quant_dict[i] = j
-        
+
     return values, quant_dict, intervals
         
 
@@ -258,8 +301,8 @@ def main():
             x1 = transform(bm, highpass_filter)
             x2 = transform(bm, lowpass_filter)
 
-            bitstring1 = simple_quantizer_encoding(x1, int(sys.argv[2]))
-            bitstring_to_file(bitstring1, h2, sys.argv[4])
+            bitstring1, rs, gs, bs = simple_quantizer_encoding(x1, int(sys.argv[2]))
+            bitstring_to_file_with_vals(bitstring1, h2, sys.argv[4], rs, gs, bs)
 
     elif sys.argv[1] == '-d':
         if len(sys.argv) < 5:
