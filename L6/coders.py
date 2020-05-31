@@ -1,4 +1,5 @@
 # Na wstępie nie pozdrawiam.
+import sys
 
 def read_tga(filename):
     with open(filename, "br") as f:
@@ -84,15 +85,15 @@ def bitmap_to_bytes(bitmap):
 
 # (min,255)
 def quants(bits, min):
-    delta = 512
+    delta = 255 - min
     n = 2**bits
     values = []
     for i in range(n):
-        values.append(int(min + delta/n * (i+0.5)))
+        values.append(int(min + delta/n * (i+1)))
     quant_dict = {}
     k = 0
-    for i in range(-255, 256):
-        if k+1 < n and abs(values[k+1] - i) < abs(values[k] - i):
+    for i in range(min, 256):
+        if k+1 < n and abs(values[k+1] - i) <= abs(values[k] - i):
             k += 1
         quant_dict[i] = k
 
@@ -101,43 +102,48 @@ def quants(bits, min):
 
 
 def differences_sequence(sequence):
-    diffs = [sequence[0]]
-    for i in range(1, len(sequence)):
-        diffs.append(sequence[i] - sequence[i-1])
-    return diffs
-
+    a = sequence[0]
+    result = [a]
+    for p in sequence[1:]:
+        a = p - a
+        result.append(a)
+        a = p
+    return result
 
 def reconstruct_from_differences(diffs):
-    sequence = [diffs[0]]
-    for i in range(1, len(diffs)):
-        sequence.append(sequence[-1] + diffs[i])
-    return sequence
+    a = diffs[0]
+    result = [a]
+    for q in diffs[1:]:
+        a = a + q
+        result.append(a)
+
+    return result
 
 
 def differential_encoding(bitmap, bits):
     pixels = []
     for _, row in enumerate(bitmap):
         for _, pixel in enumerate(row):
-            pixels.extend([pixel.r, pixel.g, pixel.b]) 
-
-    # print(pixels[500:800])
-    # differences sequence
+            pixels.extend([pixel.r, pixel.g, pixel.b])
     subs = differences_sequence(pixels)
-
+    return subs
     # n-bits quantized values
-    _, quant_dict = quants(bits, -255)
+    # v, quant_dict = quants(bits, -255)
 
     # quantize values 
-    coded = [quant_dict[el] for el in subs]
+    # coded = [quant_dict[el] for el in subs]
+    # print(coded[:100])
+    # print([v[el] for el in coded][:100])
     # print(coded)
-    return ''.join([num_to_bits(el, bits) for el in coded])
+    # return coded
+    # return ''.join([num_to_bits(el, bits) for el in coded])
 
 
-def differential_decoding(file, bits):
-    quant_vals, _ = quants(bits, -255)
+def differential_decoding(file):
+    # quant_vals, _ = quants(bits, -255)
     bitstring, header = read_encoded(file)
-    differences = [quant_vals[int(bitstring[i:i+bits], 2)] for i in range(0, len(bitstring), bits)]
-    # print(differences[:100])
+    # differences = [quant_vals[int(bitstring[i:i+bits], 2)] for i in range(0, len(bitstring), bits)]
+    differences = [int(bitstring[i:i+8], 2) for i in range(0, len(bitstring), 8)]
     rgbs = reconstruct_from_differences(differences) 
     return rgbs, header
 
@@ -181,13 +187,52 @@ def bitstring_to_file(bitstring, header, file_out):
         f.write(bytes(header) + bytes_list)
 
 
+def nonuniform_quantizer(pixels, bits, min, max):
+    n = 2**bits
+    d = {i:0 for i in range(min, max+1)}
+    for p in pixels:
+        d[p] += 1
+    intervals = {(i, i+1):d[i]+d[i+1] for i in d if i%2 == 0} 
+
+    while len(intervals) > n:
+        min_interval = sorted(intervals, key=intervals.get)[0]
+        dict_list = list(intervals)
+        k = dict_list.index(min_interval)
+
+        if k == 0:
+            to_join = dict_list[1]
+        elif k == len(dict_list) - 1:
+            to_join = dict_list[-2]
+        else:
+            if intervals[dict_list[k-1]] < intervals[dict_list[k+1]]:
+                to_join = dict_list[k-1]
+            else:
+                to_join = dict_list[k+1]
+        if to_join[0] > min_interval[0]:
+            new_interval = (min_interval[0], to_join[1])
+        else:
+            new_interval = (to_join[0], min_interval[1])
+        new_interval_value = intervals[min_interval] + intervals[to_join]
+        intervals[new_interval] = new_interval_value
+        del intervals[min_interval]
+        del intervals[to_join]
+        intervals = dict(sorted(intervals.items()))
+
+    values = [(el[0]+el[1])//2 for el in intervals]
+    quant_dict = {}
+    j = 0
+    for i in range(min, max+1):
+        if j+1 < n and abs(values[j+1] - i) <= abs(values[j] - i):
+            j += 1
+        quant_dict[i] = j
+        
+    return values, quant_dict, intervals
+        
+
 def num_to_bits(x, n):
     return bin(x)[2:].zfill(n)
 
-
-def main():
-    bm, h = read_tga("example0.tga")
-
+def smaller_header(h):
     if h[12] == 0:
         h[12] = 254
         h[13] -= 1
@@ -198,24 +243,39 @@ def main():
         h[15] -= 1
     else:
         h[14] -= 2  
+    return h
 
-    x = transform(bm, highpass_filter)
+def main():
 
-    # coded = differential_encoding(x, 5)
-    # bitstring_to_file(coded, h, "example.out")
-    # # coded2, h2 = read_encoded("example.out")
+    if sys.argv[1] == '-e':
+        if len(sys.argv) < 5:
+            print("python coders.py -e k in_file out_file1 out_file2")
+            return
+        else:
+            bm, h = read_tga(sys.argv[3])
+            h2 = smaller_header(h.copy())
 
-    # bm2 = differential_decoding("example.out", 5)
+            x1 = transform(bm, highpass_filter)
+            x2 = transform(bm, lowpass_filter)
 
-    coded = differential_encoding(x, 5)
-    bitstring_to_file(coded, h, "example.out")
-    # coded2, h2 = read_encoded("example.out")
-    bm2, h2 = differential_decoding("example.out", 5)
-    # bitstring_to_file(bm2, h2, "examplee.tga")
-    # print(bm2)
-    with open("exampleee.tga", "wb") as f:
-        f.write(bytes(h2) + bytes(bm2))
+            bitstring1 = simple_quantizer_encoding(x1, int(sys.argv[2]))
+            bitstring_to_file(bitstring1, h2, sys.argv[4])
 
+    elif sys.argv[1] == '-d':
+        if len(sys.argv) < 5:
+            print("nie tak")
+            return
+        else:
+            if sys.argv[3] == '-L':
+                rgbs, header = differential_decoding(sys.argv[4])
+                with open(sys.argv[5], "wb") as f:
+                    f.write(bytes(header) + bytes(rgbs))
+            elif sys.argv[3] == '-H':
+                rgbs, header = simple_quantizer_decoding(sys.argv[4], int(sys.argv[2]))
+                with open(sys.argv[5], "wb") as f:
+                    f.write(bytes(header) + bytes(rgbs))
+
+    
 if __name__ == "__main__":
     main()
 
