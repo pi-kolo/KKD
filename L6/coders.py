@@ -1,4 +1,5 @@
-# Na wstępie nie pozdrawiam.
+# Piotr Kołodziejczyk
+# L6
 import sys
 
 def read_tga(filename):
@@ -100,7 +101,6 @@ def quants(bits, min):
     return values, quant_dict
 
 
-
 def differences_sequence(sequence):
     a = sequence[0]
     result = [a]
@@ -109,6 +109,7 @@ def differences_sequence(sequence):
         result.append(a)
         a = p
     return result
+
 
 def reconstruct_from_differences(diffs):
     a = diffs[0]
@@ -120,31 +121,42 @@ def reconstruct_from_differences(diffs):
     return result
 
 
-def differential_encoding(bitmap, bits):
-    pixels = []
+def differential_encoding(bitmap):
+    rs = []
+    gs = []
+    bs = []
     for _, row in enumerate(bitmap):
         for _, pixel in enumerate(row):
-            pixels.extend([pixel.r, pixel.g, pixel.b])
-    subs = differences_sequence(pixels)
-    return subs
-    # n-bits quantized values
-    # v, quant_dict = quants(bits, -255)
+            rs.append(pixel.r)
+            gs.append(pixel.g)
+            bs.append(pixel.b)
 
-    # quantize values 
-    # coded = [quant_dict[el] for el in subs]
-    # print(coded[:100])
-    # print([v[el] for el in coded][:100])
-    # print(coded)
-    # return coded
-    # return ''.join([num_to_bits(el, bits) for el in coded])
+    subs_r = differences_sequence(rs)
+    subs_g = differences_sequence(gs)
+    subs_b = differences_sequence(bs)
+
+    bin_r = ['1' + bin(abs(el))[2:].zfill(8) if el < 0 else '0' + bin(abs(el))[2:].zfill(8) for el in subs_r]
+    bin_g = ['1' + bin(abs(el))[2:].zfill(8) if el < 0 else '0' + bin(abs(el))[2:].zfill(8) for el in subs_g]
+    bin_b = ['1' + bin(abs(el))[2:].zfill(8) if el < 0 else '0' + bin(abs(el))[2:].zfill(8) for el in subs_b]
+
+    bins = bin_r + bin_g + bin_b
+    return ''.join(bins) 
 
 
 def differential_decoding(file):
     # quant_vals, _ = quants(bits, -255)
     bitstring, header = read_encoded(file)
-    # differences = [quant_vals[int(bitstring[i:i+bits], 2)] for i in range(0, len(bitstring), bits)]
-    differences = [int(bitstring[i:i+8], 2) for i in range(0, len(bitstring), 8)]
-    rgbs = reconstruct_from_differences(differences) 
+    all_colors = [int(el[1:], 2) if el[0] == '0' else -int(el[1:], 2) for el in [bitstring[i:i+9] for i in range(0, len(bitstring), 9)]]
+    r_list = [el for el in all_colors[0 : len(all_colors)//3]]
+    g_list = [el for el in all_colors[len(all_colors)//3 : 2*len(all_colors)//3]]
+    b_list = [el for el in all_colors[2*len(all_colors)//3 :]]
+    
+    rs = reconstruct_from_differences(r_list)
+    gs = reconstruct_from_differences(g_list)
+    bs = reconstruct_from_differences(b_list)
+    rgbs = []
+    for i in range(len(rs)):
+        rgbs.extend([rs[i], gs[i], bs[i]]) 
     return rgbs, header
 
 
@@ -229,7 +241,7 @@ def bitstring_to_file_with_vals(bitstring, header, file_out, rs, gs, bs):
         f.write(bytes('\n', 'utf-8'))
         f.write(bytes_list)
 
-
+# simple nonuniform quantizer - joins intervals with smaller weights (visibly efficient for smaller k)
 def nonuniform_quantizer(pixels, bits, min, max):
     n = 2**bits
     d = {i:0 for i in range(min, max+1)}
@@ -288,6 +300,7 @@ def smaller_header(h):
         h[14] -= 2  
     return h
 
+
 def main():
 
     if sys.argv[1] == '-e':
@@ -304,9 +317,12 @@ def main():
             bitstring1, rs, gs, bs = simple_quantizer_encoding(x1, int(sys.argv[2]))
             bitstring_to_file_with_vals(bitstring1, h2, sys.argv[4], rs, gs, bs)
 
+            bitstring2 = differential_encoding(x2)
+            bitstring_to_file(bitstring2, h2, sys.argv[5])
+
     elif sys.argv[1] == '-d':
         if len(sys.argv) < 5:
-            print("nie tak")
+            print("python coders.py -d k -H/-L in_file out_file1 out_file2")
             return
         else:
             if sys.argv[3] == '-L':
